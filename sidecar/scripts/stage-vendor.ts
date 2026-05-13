@@ -47,14 +47,12 @@ const GH_SHA256 = {
 
 // Linux release tarballs for `gh` (separate table because Linux uses .tar.gz,
 // macOS uses .zip; SHAs come from the same upstream `gh_${VER}_checksums.txt`).
-// TODO(linux): replace placeholders with the real digests pulled from
+// To bump: refresh from
 //   https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_checksums.txt
-//   The expected lines are `gh_${GH_VERSION}_linux_amd64.tar.gz` and
-//   `gh_${GH_VERSION}_linux_arm64.tar.gz`. Until then, staging will fail at
-//   the sha256 verify step with a clear mismatch message.
+// Look for `gh_${VERSION}_linux_amd64.tar.gz` and `_linux_arm64.tar.gz`.
 const GH_SHA256_LINUX = {
-	arm64: "TODO_LINUX_ARM64_SHA",
-	amd64: "TODO_LINUX_AMD64_SHA",
+	arm64: "ccbed39c472d3dc1c501d1e164a9cffd934c5f6fce1012811a1a59d24cb7d7c6",
+	amd64: "304a0d2460f4a8847d2f192bad4e2a32cd9420d28716e7ae32198181b65b5f9c",
 } as const;
 
 const GLAB_VERSION = "1.93.0";
@@ -63,14 +61,14 @@ const GLAB_SHA256 = {
 	amd64: "79d1a4f933919689c5fb7774feb1dd08f30b9c896dff4283b4a7387689ee0531",
 } as const;
 
-// Linux glab uses the capitalized `Linux` slug
-// (glab_${VER}_Linux_{amd64,arm64}.tar.gz) — verify the digests against the
-// upstream `checksums.txt` published next to the release.
-// TODO(linux): fill in real digests from
-//   https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/checksums.txt
+// Linux glab uses the lowercase `linux` slug
+// (glab_${VER}_linux_{amd64,arm64}.tar.gz) — confirmed against the asset
+// list returned by GitLab's release API. To bump, fetch each tarball from
+//   https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_${arch}.tar.gz
+// and run `sha256sum` on the cached file.
 const GLAB_SHA256_LINUX = {
-	arm64: "TODO_LINUX_ARM64_SHA",
-	amd64: "TODO_LINUX_AMD64_SHA",
+	arm64: "8d336072e190e540c1ecb187c17d039b3ab408cbb6f1b3c843327a77033145d0",
+	amd64: "300f3c12bd75f298747364f382f978bbe63809ef660bb2969925f343f9c20ae4",
 } as const;
 
 // Codex version is whatever sidecar/package.json pulled in. The SHAs below
@@ -94,8 +92,8 @@ const CODEX_SHA256: Readonly<
 		arm64: "f6fef2ceee8977079ad3b3296b4c14c2707934e6b4ec1aa1a32d6e512196b12d",
 		x64: "21f161ffd79fab88c5bd91e40d14c894fe6d4ad61ea4ebc80d4fcf20130960c2",
 		linux: {
-			arm64: "TODO_LINUX_ARM64_SHA",
-			x64: "TODO_LINUX_X64_SHA",
+			arm64: "3f217260abe83c6f0fd7a83e056cb453537e435c6754cd335ecd935823d8f3de",
+			x64: "91e12a56c49c702c86c5c42811cfa3d515b6d6bc196d70ba9cea25227302aa8f",
 		},
 	},
 };
@@ -119,8 +117,8 @@ const CLAUDE_CODE_SHA256: Readonly<
 		arm64: "ed9a4c64c8b5374da8389ff6aa4b58fce7a792f90ef2261a14445d9082a80799",
 		x64: "71d18ce1d457f37b427bdcb5933424c83bf22b39b2b7628415028585b832fe6c",
 		linux: {
-			arm64: "TODO_LINUX_ARM64_SHA",
-			x64: "TODO_LINUX_X64_SHA",
+			arm64: "91d54cb3f13f884823f343206ac0de2edcce75ab8958d21460d500e40b692d3c",
+			x64: "671e12d58883de4bc6db3654884dcafc74143598da9798f23d6b77c5627b14e5",
 		},
 	},
 };
@@ -184,7 +182,9 @@ function infoForPlatform(
 		};
 	}
 
-	// Linux
+	// Linux. Codex publishes its Linux binaries as statically-linked musl,
+	// so the npm tarball nests under `vendor/<arch>-unknown-linux-musl/`
+	// even when host/target rust toolchain is `*-linux-gnu`.
 	if (arch === "arm64") {
 		return {
 			platform,
@@ -192,7 +192,7 @@ function infoForPlatform(
 			claudeCodePkg: "@anthropic-ai/claude-code-linux-arm64",
 			claudeCodeNpmSuffix: "linux-arm64",
 			codexPkg: "@openai/codex-linux-arm64",
-			codexTriple: "aarch64-unknown-linux-gnu",
+			codexTriple: "aarch64-unknown-linux-musl",
 			codexNpmSuffix: "linux-arm64",
 			ghArch: "arm64",
 			glabArch: "arm64",
@@ -204,7 +204,7 @@ function infoForPlatform(
 		claudeCodePkg: "@anthropic-ai/claude-code-linux-x64",
 		claudeCodeNpmSuffix: "linux-x64",
 		codexPkg: "@openai/codex-linux-x64",
-		codexTriple: "x86_64-unknown-linux-gnu",
+		codexTriple: "x86_64-unknown-linux-musl",
 		codexNpmSuffix: "linux-x64",
 		ghArch: "amd64",
 		glabArch: "amd64",
@@ -437,9 +437,10 @@ function stageGhBinary(target: TargetInfo): string {
 function stageGlabBinary(target: TargetInfo): string {
 	ensureCacheDir();
 	const arch = target.glabArch;
-	// glab uses a capitalized OS slug on Linux (`Linux`) and lowercase on macOS
-	// (`darwin`). Same archive shape (tar.gz with bin/glab inside) on both.
-	const osSlug = target.platform === "linux" ? "Linux" : "darwin";
+	// glab uses lowercase OS slugs (`linux`/`darwin`) — confirmed against the
+	// asset list returned by GitLab's release API. Same archive shape
+	// (tar.gz with bin/glab inside) on both.
+	const osSlug = target.platform === "linux" ? "linux" : "darwin";
 	const slug = `glab_${GLAB_VERSION}_${osSlug}_${arch}`;
 	const archive = join(BUNDLE_CACHE, `${slug}.tar.gz`);
 	const url = `https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/${slug}.tar.gz`;
