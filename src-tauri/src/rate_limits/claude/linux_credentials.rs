@@ -8,11 +8,6 @@
 //! lookup order so Helmor reads from exactly the file Claude CLI
 //! itself reads from — no IPC, no daemon, no extra dependencies.
 
-// The keychain module is the live caller on Linux today; this file is
-// wired in by the macos/linux platform-dispatch refactor (Task #6).
-// Until that lands, the helpers below have no non-test callers.
-#![allow(dead_code)]
-
 use std::fs;
 use std::path::PathBuf;
 
