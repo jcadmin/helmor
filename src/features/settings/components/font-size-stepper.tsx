@@ -11,9 +11,10 @@ export type FontSizeStepperProps = {
 	ariaLabel?: string;
 };
 
-/// Two-button +/- stepper with a centered numeric label. Used for all
-/// three appearance font sizes (chat, UI, code) so they stay visually
-/// identical and the bounds live with the caller.
+/// Two-button +/- stepper with a centered numeric label. Used for the
+/// chat font size, code font size, and interface zoom percentage rows
+/// in Appearance settings so they stay visually identical and the
+/// bounds (min/max/step/unit) live with the caller.
 export function FontSizeStepper({
 	value,
 	onChange,

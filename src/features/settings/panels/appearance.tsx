@@ -9,6 +9,7 @@ import {
 	type ThemeMode,
 } from "@/lib/settings";
 import { cn } from "@/lib/utils";
+import { clampZoom, ZOOM_STEP } from "@/shell/use-zoom";
 import { FontPicker } from "../components/font-picker";
 import { FontSizeStepper } from "../components/font-size-stepper";
 import { SettingsGroup, SettingsRow } from "../components/settings-row";
@@ -190,6 +191,38 @@ export function AppearancePanel({
 					min={12}
 					max={24}
 					ariaLabel="Chat font size"
+				/>
+			</SettingsRow>
+
+			{/* ── Code font size ────────────────────────────────────────────── */}
+			<SettingsRow
+				title="Code font size"
+				description="Size used for code blocks inside AI messages"
+			>
+				<FontSizeStepper
+					value={settings.codeFontSize}
+					onChange={(next) => updateSettings({ codeFontSize: next })}
+					min={10}
+					max={20}
+					ariaLabel="Code font size"
+				/>
+			</SettingsRow>
+
+			{/* ── Interface zoom ────────────────────────────────────────────── */}
+			<SettingsRow
+				title="Interface zoom"
+				description="Scale the entire app UI (sidebar, panels, dialogs)"
+			>
+				<FontSizeStepper
+					value={Math.round(settings.zoomLevel * 100)}
+					onChange={(next) =>
+						updateSettings({ zoomLevel: clampZoom(next / 100) })
+					}
+					min={50}
+					max={200}
+					step={Math.round(ZOOM_STEP * 100)}
+					unit="%"
+					ariaLabel="Interface zoom"
 				/>
 			</SettingsRow>
 

@@ -19,6 +19,7 @@ export type ThemeApplicationOptions = {
 	codeFontFamily: string | null;
 	terminalFontFamily: string | null;
 	chatFontSize: number;
+	codeFontSize: number;
 	usePointerCursors: boolean;
 };
 
@@ -42,6 +43,7 @@ export function useThemeApplication(opts: ThemeApplicationOptions): void {
 		codeFontFamily,
 		terminalFontFamily,
 		chatFontSize,
+		codeFontSize,
 		usePointerCursors,
 	} = opts;
 
@@ -109,6 +111,16 @@ export function useThemeApplication(opts: ThemeApplicationOptions): void {
 			`${chatFontSize}px`,
 		);
 	}, [chatFontSize]);
+
+	// Code-block font size mirrored to a CSS var so the AI message code
+	// renderer (`components/ai/code-block.tsx`) can pick it up via
+	// `text-[length:var(--code-font-size,12px)]` without prop drilling.
+	useEffect(() => {
+		document.documentElement.style.setProperty(
+			"--code-font-size",
+			`${codeFontSize}px`,
+		);
+	}, [codeFontSize]);
 
 	// Pointer-cursor toggle — class on <html> so CSS can flip the global
 	// cursor rule without a JS round-trip.

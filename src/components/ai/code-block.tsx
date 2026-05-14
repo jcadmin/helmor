@@ -153,7 +153,7 @@ export const CodeBlock = ({
 		? "overflow-x-hidden overflow-y-hidden [&>pre]:whitespace-pre-wrap [&>pre]:break-words [&_code]:whitespace-pre-wrap [&_code]:break-words"
 		: "overflow-x-auto overflow-y-hidden [&>pre]:min-w-full";
 	const codeBase =
-		"[&>pre]:m-0 [&>pre]:bg-transparent! [&>pre]:text-[12px] [&>pre]:leading-5 [&>pre]:text-foreground! [&_code]:font-mono [&_code]:text-[12px]";
+		"[&>pre]:m-0 [&>pre]:bg-transparent! [&>pre]:text-[length:var(--code-font-size,12px)] [&>pre]:leading-[1.55] [&>pre]:text-foreground! [&_code]:font-mono [&_code]:text-[length:var(--code-font-size,12px)]";
 
 	return (
 		<CodeBlockContext.Provider value={{ code }}>

@@ -189,6 +189,10 @@ export type AppSettings = {
 	/** Chat message body font size (px). Migrated from the legacy `fontSize`
 	 *  field, which only ever affected chat rendering. */
 	chatFontSize: number;
+	/** Code block font size (px) used by AI message code rendering.
+	 *  Independent from chat body so users can shrink dense code without
+	 *  shrinking prose. */
+	codeFontSize: number;
 	/** Override for the sans-serif UI font stack. `null` = preset default. */
 	uiFontFamily: string | null;
 	/** Override for the monospace code font stack. `null` = preset default. */
@@ -276,6 +280,7 @@ export const CONTEXT_USAGE_AUTO_REVEAL_THRESHOLD = 70;
 
 export const DEFAULT_SETTINGS: AppSettings = {
 	chatFontSize: 14,
+	codeFontSize: 12,
 	uiFontFamily: null,
 	codeFontFamily: null,
 	terminalFontFamily: null,
@@ -425,6 +430,7 @@ const SETTINGS_KEY_MAP: Record<
 	string
 > = {
 	chatFontSize: "app.chat_font_size",
+	codeFontSize: "app.code_font_size",
 	usePointerCursors: "app.use_pointer_cursors",
 	notifications: "app.notifications",
 	terminalHoverExpansion: "app.terminal_hover_expansion",
@@ -876,8 +882,13 @@ export async function loadSettings(): Promise<AppSettings> {
 		return {
 			chatFontSize: readClampedInt(
 				raw[SETTINGS_KEY_MAP.chatFontSize] ?? legacyFontSize,
-				{ min: 10, max: 24, fallback: DEFAULT_SETTINGS.chatFontSize },
+				{ min: 12, max: 24, fallback: DEFAULT_SETTINGS.chatFontSize },
 			),
+			codeFontSize: readClampedInt(raw[SETTINGS_KEY_MAP.codeFontSize], {
+				min: 10,
+				max: 20,
+				fallback: DEFAULT_SETTINGS.codeFontSize,
+			}),
 			uiFontFamily: readLocalStorageString(UI_FONT_FAMILY_STORAGE_KEY),
 			codeFontFamily: readLocalStorageString(CODE_FONT_FAMILY_STORAGE_KEY),
 			terminalFontFamily: readLocalStorageString(

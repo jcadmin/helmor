@@ -806,6 +806,7 @@ function AppShell({
 		codeFontFamily: appSettings.codeFontFamily,
 		terminalFontFamily: appSettings.terminalFontFamily,
 		chatFontSize: appSettings.chatFontSize,
+		codeFontSize: appSettings.codeFontSize,
 		usePointerCursors: appSettings.usePointerCursors,
 	});
 
