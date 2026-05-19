@@ -74,7 +74,10 @@ export function ShellSidebarPane({
 					: "transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
 				collapsed ? "pointer-events-none" : "",
 			)}
-			style={{ width: collapsed ? 0 : `${width}px` }}
+			// Width driven by CSS var (use-panels.ts writes it on drag) — no React render.
+			style={{
+				width: collapsed ? 0 : `var(--shell-sidebar-width, ${width}px)`,
+			}}
 		>
 			<div
 				className={cn(
@@ -83,7 +86,7 @@ export function ShellSidebarPane({
 						? "-translate-x-full opacity-0"
 						: "translate-x-0 opacity-100",
 				)}
-				style={{ width: `${width}px` }}
+				style={{ width: `var(--shell-sidebar-width, ${width}px)` }}
 			>
 				<div className="min-h-0 flex-1">
 					<WorkspacesSidebarContainer

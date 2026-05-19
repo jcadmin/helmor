@@ -10,6 +10,7 @@ import { WorkspaceInspectorSidebar } from "@/features/inspector";
 import { WorkspaceStartContextSidebar } from "@/features/workspace-start/context-sidebar";
 import type {
 	ChangeRequestInfo,
+	DetectedEditor,
 	RepositoryCreateOption,
 	WorkspaceDetail,
 } from "@/lib/api";
@@ -49,6 +50,7 @@ type Props = {
 	selectedWorkspaceDetail: WorkspaceDetail | null;
 	displayedSessionId: string | null;
 	activeEditor: ActiveEditorTarget | null;
+	preferredEditor: DetectedEditor | null;
 	onOpenEditorFile: (path: string, options?: DiffOpenOptions) => void;
 	onCommitAction: (mode: WorkspaceCommitButtonMode) => Promise<void>;
 	onReviewAction: () => Promise<void>;
@@ -84,6 +86,7 @@ export function ShellInspectorPane({
 	selectedWorkspaceDetail,
 	displayedSessionId,
 	activeEditor,
+	preferredEditor,
 	onOpenEditorFile,
 	onCommitAction,
 	onReviewAction,
@@ -115,7 +118,15 @@ export function ShellInspectorPane({
 					: "transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
 				collapsed ? "pointer-events-none" : "",
 			)}
-			style={{ width: collapsed ? 0 : `${width}px` }}
+			// Width driven by CSS var (use-panels.ts writes it on drag) — no React render.
+			// `contain: layout style` isolates the inspector's inner layout from the
+			// outer shell. Without it, dragging the inspector's ~4000 elements costs
+			// ~52ms/frame; with it, ~33ms. Skip `paint` so the tabs hover-zoom can
+			// still overflow the aside (`has-[[data-tabs-zoomed=true]]:overflow-visible`).
+			style={{
+				contain: "layout style",
+				width: collapsed ? 0 : `var(--shell-inspector-width, ${width}px)`,
+			}}
 		>
 			<div
 				className={cn(
@@ -124,7 +135,7 @@ export function ShellInspectorPane({
 						? "translate-x-full opacity-0"
 						: "translate-x-0 opacity-100",
 				)}
-				style={{ width: `${width}px` }}
+				style={{ width: `var(--shell-inspector-width, ${width}px)` }}
 			>
 				{rightSidebarMode === "context" ? (
 					<WorkspaceStartContextSidebar
@@ -168,6 +179,7 @@ export function ShellInspectorPane({
 						workspaceTargetBranch={targetBranch}
 						editorMode={editorMode}
 						activeEditor={activeEditor}
+						preferredEditor={preferredEditor}
 						onOpenEditorFile={onOpenEditorFile}
 						onCommitAction={onCommitAction}
 						onReviewAction={onReviewAction}

@@ -3,8 +3,13 @@ import {
 	type MouseEvent,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useState,
 } from "react";
+import {
+	suspendTerminalFit,
+	suspendTerminalWrites,
+} from "@/components/terminal-output";
 import {
 	clampSidebarWidth,
 	getInitialSidebarWidth,
@@ -21,6 +26,51 @@ type ResizeState = {
 	target: ResizeTarget;
 };
 
+export const SIDEBAR_WIDTH_VAR = "--shell-sidebar-width";
+export const INSPECTOR_WIDTH_VAR = "--shell-inspector-width";
+
+// Module-level resize state store. Kept out of React state so subscribers
+// don't re-render on drag start/end — they only flush via the listener.
+type ResizeListener = (active: boolean) => void;
+const resizeListeners = new Set<ResizeListener>();
+let resizingActive = false;
+
+export function isShellResizing(): boolean {
+	return resizingActive;
+}
+
+export function onShellResize(listener: ResizeListener): () => void {
+	resizeListeners.add(listener);
+	return () => {
+		resizeListeners.delete(listener);
+	};
+}
+
+function setResizingActive(active: boolean) {
+	if (resizingActive === active) return;
+	resizingActive = active;
+	for (const listener of resizeListeners) {
+		listener(active);
+	}
+}
+
+function writeWidthVar(target: ResizeTarget, width: number) {
+	if (typeof document === "undefined") return;
+	const varName =
+		target === "sidebar" ? SIDEBAR_WIDTH_VAR : INSPECTOR_WIDTH_VAR;
+	document.documentElement.style.setProperty(varName, `${width}px`);
+}
+
+// Seed the CSS vars at module load so the DOM has a width before React's
+// first render — avoids a one-frame 0-width flash.
+if (typeof document !== "undefined") {
+	writeWidthVar("sidebar", getInitialSidebarWidth());
+	writeWidthVar(
+		"inspector",
+		getInitialSidebarWidth(INSPECTOR_WIDTH_STORAGE_KEY),
+	);
+}
+
 export function useShellPanels() {
 	const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth);
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -28,6 +78,18 @@ export function useShellPanels() {
 		getInitialSidebarWidth(INSPECTOR_WIDTH_STORAGE_KEY),
 	);
 	const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+
+	// React state → CSS var sync. Only fires for non-drag cases (keyboard
+	// step, initial mount, mouseup commit). During drag, mousemove writes
+	// the var directly and React state is stale — but setProperty with the
+	// same value is a no-op.
+	useLayoutEffect(() => {
+		writeWidthVar("sidebar", sidebarWidth);
+	}, [sidebarWidth]);
+
+	useLayoutEffect(() => {
+		writeWidthVar("inspector", inspectorWidth);
+	}, [inspectorWidth]);
 
 	useEffect(() => {
 		try {
@@ -62,18 +124,20 @@ export function useShellPanels() {
 			return;
 		}
 
+		setResizingActive(true);
+		// Pause xterm fit + writes so a live run script doesn't thrash the
+		// main thread mid-drag. Released on mouseup.
+		const releaseFitSuspend = suspendTerminalFit();
+		const releaseWriteSuspend = suspendTerminalWrites();
+
 		let pendingWidth: number | null = null;
 		let rafId: number | null = null;
-		const flush = () => {
+
+		// Drag-time path: only writes the CSS var, never touches React.
+		const flushVar = () => {
 			rafId = null;
 			if (pendingWidth === null) return;
-			const nextWidth = pendingWidth;
-			pendingWidth = null;
-			if (resizeState.target === "sidebar") {
-				setSidebarWidth(nextWidth);
-			} else {
-				setInspectorWidth(nextWidth);
-			}
+			writeWidthVar(resizeState.target, pendingWidth);
 		};
 
 		const handleMouseMove = (event: globalThis.MouseEvent) => {
@@ -84,15 +148,27 @@ export function useShellPanels() {
 					: resizeState.sidebarWidth - deltaX;
 			pendingWidth = clampSidebarWidth(rawWidth);
 			if (rafId === null) {
-				rafId = window.requestAnimationFrame(flush);
+				rafId = window.requestAnimationFrame(flushVar);
 			}
 		};
+
 		const handleMouseUp = () => {
 			if (rafId !== null) {
 				window.cancelAnimationFrame(rafId);
 				rafId = null;
 			}
-			flush();
+			flushVar();
+			// Commit the final CSS var value back to React state for
+			// persistence and any width-dependent non-drag consumers.
+			const finalWidth = pendingWidth;
+			if (finalWidth !== null) {
+				if (resizeState.target === "sidebar") {
+					setSidebarWidth(finalWidth);
+				} else {
+					setInspectorWidth(finalWidth);
+				}
+			}
+			setResizingActive(false);
 			setResizeState(null);
 		};
 		const previousCursor = document.body.style.cursor;
@@ -108,6 +184,9 @@ export function useShellPanels() {
 			if (rafId !== null) {
 				window.cancelAnimationFrame(rafId);
 			}
+			setResizingActive(false);
+			releaseFitSuspend();
+			releaseWriteSuspend();
 			document.body.style.cursor = previousCursor;
 			document.body.style.userSelect = previousUserSelect;
 			window.removeEventListener("mousemove", handleMouseMove);
